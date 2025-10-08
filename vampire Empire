@@ -538,25 +538,3 @@ if Aimbot.ShowFOV then
 end
 
 -- Silent Aim Hook
-local oldNamecall
-oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-    local method = getnamecallmethod()
-    if Aimbot.Enabled and method == "FireServer" and self.Name:find("Shoot") then
-        local closest = getClosestPlayer()
-        if closest then
-            local args = {...}
-            local pos = closest.Position
-            if Aimbot.Predict then
-                local vel = closest.AssemblyLinearVelocity
-                pos = pos + vel * 0.1
-            end
-            args[1] = pos
-            return oldNamecall(self, unpack(args))
-        end
-    end
-    return oldNamecall(self, ...)
-end)
-
--- TriggerBot
-spawn(function()
-    while
