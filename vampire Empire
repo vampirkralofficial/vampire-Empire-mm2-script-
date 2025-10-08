@@ -1,0 +1,562 @@
+--!native
+-- MM2 ENHANCED v3.5 ‑ Premium Edition (08.10.2025)
+-- Author: kiwi (discord: kiwii#0420) – MIT Licence
+-- Compatible: Synapse X, Script-Ware, Fluxus, Delta, Electron, Valyse, Wave, Arceus, Hydrogen, Trigon, Comet, Kiwi X, Vega, etc.
+
+--------------------------------------------------------------------
+-- 0. FAST GUARD
+--------------------------------------------------------------------
+if getgenv().MM2PremiumLoaded then return end
+getgenv().MM2PremiumLoaded = true
+
+--------------------------------------------------------------------
+-- 1. SERVICES & SHORTCUTS
+--------------------------------------------------------------------
+local Players = game:GetService("Players")
+local RS = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local TS = game:GetService("TweenService")
+local SG = game:GetService("StarterGui")
+local CG = game:GetService("CoreGui")
+local LP = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
+local Http = game:GetService("HttpService")
+
+--------------------------------------------------------------------
+-- 2. CONFIG (SAVE / LOAD / MIGRATE)
+--------------------------------------------------------------------
+local CFG_FOLDER = "mm2_premium_v35"
+local CFG_FILE = "premium.json"
+local COLOR_FILE = "colors.json"
+local LANG_FILE = "lang.json"
+
+local function ensureFolder()
+    if not isfolder(CFG_FOLDER) then makefolder(CFG_FOLDER) end
+end
+local function loadJson(name, default)
+    ensureFolder()
+    local path = CFG_FOLDER .. "/" .. name
+    local suc, res = pcall(readfile, path)
+    return suc and Http:JSONDecode(res) or default
+end
+local function saveJson(name, tbl)
+    ensureFolder()
+    writefile(CFG_FOLDER .. "/" .. name, Http:JSONEncode(tbl))
+end
+
+local Cfg = loadJson(CFG_FILE, {})
+local Colors = loadJson(COLOR_FILE, {
+    Murderer = Color3.fromRGB(255, 0, 0),
+    Sheriff = Color3.fromRGB(0, 120, 255),
+    Hero = Color3.fromRGB(255, 200, 0),
+    Innocent = Color3.fromRGB(0, 255, 0),
+    Box = Color3.fromRGB(255, 255, 255),
+    Tracer = Color3.fromRGB(255, 255, 255)
+})
+local Lang = loadJson(LANG_FILE, {
+    Murderer = "Katil",
+    Sheriff = "Şerif",
+    Hero = "Kahraman",
+    Innocent = "Masum",
+    ESP = "ESP",
+    SilentAim = "Sessiz Nişan",
+    TriggerBot = "Tetik Bot",
+    Fly = "Uçma",
+    Noclip = "Duvar Geçiş",
+    Speed = "Hız",
+    Jump = "Zıplama",
+    InfJump = "Sonsuz Zıplama",
+    FullBright = "Tam Parlaklık",
+    AutoStab = "Oto Bıçak",
+    AutoShoot = "Oto Ateş",
+    AutoLoot = "Oto Topla",
+    AutoCoin = "Oto Coin",
+    AutoDance = "Oto Dans",
+    GunESP = "Silah ESP",
+    PetESP = "Pet ESP",
+    ChestESP = "Sandık ESP",
+    CoinESP = "Coin ESP",
+    CollectESP = "Toplanabilir ESP",
+    KillAll = "Tümünü Öldür",
+    LoopTeleport = "Döngüsel Işın",
+    BringGuns = "Silahları Getir",
+    BringCoins = "Coinleri Getir",
+    NightMode = "Gece Modu",
+    FogRemove = "Sis Kaldır",
+    ZoomHack = "Zoom Hilesi",
+    RemoveHands = "Elleri Kaldır",
+    Chams = "Chams",
+    RainbowGun = "Gökkuşağı Silah",
+    RainbowPet = "Gökkuşağı Pet",
+    StreamProof = "Stream-Proof",
+    SaveConfig = "Konfigürasyonu Kaydet",
+    LoadConfig = "Konfigürasyonu Yükle",
+    Language = "Dil",
+    Hotkeys = "Kısayollar",
+    UI = "Arayüz"
+})
+
+--------------------------------------------------------------------
+-- 3. ROLE CACHE (ultra-fast)
+--------------------------------------------------------------------
+local RoleCache = {}
+local function scanRoles()
+    local plrGui = LP:FindFirstChildOfClass("PlayerGui")
+    if not plrGui then return end
+    local lists = { plrGui:FindFirstChild("PlayerList", true), plrGui:FindFirstChild("Scoreboard", true) }
+    for _, list in ipairs(lists) do
+        if not list then continue end
+        for _, frame in ipairs(list:GetDescendants()) do
+            if frame.Name == "Role" and frame:IsA("ImageLabel") then
+                local img = frame.Image
+                local parent = frame.Parent
+                local nameLbl = parent and parent:FindFirstChild("PlayerName")
+                local name = nameLbl and nameLbl.Text
+                if name then
+                    if img:find("Murderer") then RoleCache[name] = "Murderer"
+                    elseif img:find("Sheriff") then RoleCache[name] = "Sheriff"
+                    elseif img:find("Hero") then RoleCache[name] = "Hero"
+                    else RoleCache[name] = "Innocent" end
+                end
+            end
+        end
+    end
+end
+LP.PlayerGui.ChildAdded:Connect(function(c) if c.Name:find("PlayerList") or c.Name:find("Scoreboard") then scanRoles() end end)
+scanRoles()
+
+--------------------------------------------------------------------
+-- 4. STREAM-PROOF ESP MODULE (BillboardGui + Adornees)
+--------------------------------------------------------------------
+local ESP = {
+    Enabled = Cfg.ESPEnabled ~= false,
+    ShowNames = Cfg.ShowNames ~= false,
+    ShowBoxes = Cfg.ShowBoxes ~= false,
+    ShowTracers = Cfg.ShowTracers ~= false,
+    ShowHealth = Cfg.ShowHealth ~= false,
+    ShowDistance = Cfg.ShowDistance ~= false,
+    ShowRole = Cfg.ShowRole ~= false,
+    ShowGun = Cfg.ShowGun ~= false,
+    ShowPet = Cfg.ShowPet ~= false,
+    ShowChest = Cfg.ShowChest ~= false,
+    ShowCoin = Cfg.ShowCoin ~= false,
+    ShowCollect = Cfg.ShowCollect ~= false,
+    UseRoleColor = Cfg.UseRoleColor ~= false,
+    Box3D = Cfg.Box3D ~= false,
+    TracerOrigin = Cfg.TracerOrigin or "Bottom", -- Top / Center / Mouse
+    MaxDistance = Cfg.MaxDistance or 5000,
+    Font = Enum.Font.Code,
+    TextSize = Cfg.TextSize or 14,
+    Thickness = Cfg.Thickness or 1,
+    Transparency = Cfg.Transparency or 1,
+    Objects = {},
+    GunObjects = {},
+    PetObjects = {},
+    ChestObjects = {},
+    CoinObjects = {},
+    CollectObjects = {}
+}
+do
+    local bbProto = Instance.new("BillboardGui")
+    bbProto.Size = UDim2.new(0, 200, 0, 50)
+    bbProto.StudsOffset = Vector3.new(0, 3, 0)
+    bbProto.AlwaysOnTop = true
+    bbProto.LightInfluence = 0
+    bbProto.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+    local function createBillboard(parent, name)
+        local bb = bbProto:Clone()
+        bb.Name = "MM35_" .. name
+        bb.Parent = parent
+        return bb
+    end
+
+    local function create3DBox(ad)
+        local box = Instance.new("BoxHandleAdornment")
+        box.Size = Vector3.new(4, 5, 2)
+        box.Color3 = Color3.new(1, 1, 1)
+        box.Transparency = 0.5
+        box.ZIndex = 0
+        box.AlwaysOnTop = true
+        box.Adornee = ad
+        box.Parent = CG
+        return box
+    end
+
+    local function createTracer()
+        local line = Drawing.new("Line")
+        line.Thickness = ESP.Thickness
+        line.Transparency = ESP.Transparency
+        return line
+    end
+
+    function ESP:AddPlayer(player)
+        if self.Objects[player] then return end
+        local character = player.Character or player.CharacterAdded:Wait()
+        local root = character:WaitForChild("HumanoidRootPart")
+        local humanoid = character:WaitForChildOfClass("Humanoid")
+
+        local bill = createBillboard(root, player.Name)
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Text = ""
+        label.Font = self.Font
+        label.TextSize = self.TextSize
+        label.TextColor3 = Color3.new(1, 1, 1)
+        label.Parent = bill
+
+        local box3d
+        if self.Box3D then
+            box3d = create3DBox(root)
+        end
+
+        local tracer
+        if self.ShowTracers then
+            tracer = createTracer()
+        end
+
+        self.Objects[player] = {
+            bill = bill,
+            label = label,
+            humanoid = humanoid,
+            root = root,
+            box3d = box3d,
+            tracer = tracer,
+            lastUpdate = 0
+        }
+    end
+
+    function ESP:RemovePlayer(player)
+        local t = self.Objects[player]
+        if t then
+            if t.bill then t.bill:Destroy() end
+            if t.box3d then t.box3d:Destroy() end
+            if t.tracer then t.tracer:Remove() end
+            self.Objects[player] = nil
+        end
+    end
+
+    function ESP:UpdatePlayer()
+        if not self.Enabled then
+            for _, v in pairs(self.Objects) do
+                v.bill.Enabled = false
+                if v.box3d then v.box3d.Visible = false end
+                if v.tracer then v.tracer.Visible = false end
+            end
+            return
+        end
+        local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+        if not myRoot then return end
+        for plr, t in pairs(self.Objects) do
+            local char = plr.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+            if root and humanoid then
+                local dist = (root.Position - myRoot.Position).Magnitude
+                if dist <= self.MaxDistance then
+                    t.bill.Enabled = true
+                    if t.box3d then
+                        t.box3d.Visible = self.ShowBoxes
+                        t.box3d.Color3 = self.UseRoleColor and Colors[RoleCache[plr.Name] or "Innocent"] or Colors.Box
+                    end
+                    if t.tracer then
+                        t.tracer.Visible = self.ShowTracers
+                        local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
+                        if onScreen then
+                            local origin
+                            if self.TracerOrigin == "Bottom" then
+                                origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                            elseif self.TracerOrigin == "Center" then
+                                origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+                            elseif self.TracerOrigin == "Mouse" then
+                                origin = UIS:GetMouseLocation()
+                            end
+                            t.tracer.From = origin
+                            t.tracer.To = Vector2.new(pos.X, pos.Y)
+                            t.tracer.Color = self.UseRoleColor and Colors[RoleCache[plr.Name] or "Innocent"] or Colors.Tracer
+                        end
+                    end
+                    local txt = {}
+                    if self.ShowNames then table.insert(txt, plr.Name) end
+                    if self.ShowRole then table.insert(txt, Lang[RoleCache[plr.Name] or "Innocent"]) end
+                    if self.ShowDistance then table.insert(txt, string.format("[%dm]", math.floor(dist))) end
+                    if self.ShowHealth then table.insert(txt, string.format("HP:%d", humanoid.Health)) end
+                    t.label.Text = table.concat(txt, "\n")
+                    t.label.TextColor3 = self.UseRoleColor and Colors[RoleCache[plr.Name] or "Innocent"] or Color3.new(1, 1, 1)
+                else
+                    t.bill.Enabled = false
+                    if t.box3d then t.box3d.Visible = false end
+                    if t.tracer then t.tracer.Visible = false end
+                end
+            else
+                t.bill.Enabled = false
+                if t.box3d then t.box3d.Visible = false end
+                if t.tracer then t.tracer.Visible = false end
+            end
+        end
+    end
+
+    -- GUN ESP
+    function ESP:AddGun(gun)
+        if self.GunObjects[gun] then return end
+        local bill = createBillboard(gun, "Gun")
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Text = "🔫"
+        label.Font = self.Font
+        label.TextSize = self.TextSize
+        label.TextColor3 = Colors.Sheriff
+        label.Parent = bill
+        self.GunObjects[gun] = { bill = bill, label = label }
+    end
+    function ESP:RemoveGun(gun)
+        local t = self.GunObjects[gun]
+        if t then
+            t.bill:Destroy()
+            self.GunObjects[gun] = nil
+        end
+    end
+    function ESP:UpdateGun()
+        if not self.ShowGun then
+            for _, v in pairs(self.GunObjects) do v.bill.Enabled = false end
+            return
+        end
+        for gun, t in pairs(self.GunObjects) do
+            if gun.Parent then
+                t.bill.Enabled = true
+            else
+                t.bill.Enabled = false
+            end
+        end
+    end
+
+    -- PET ESP
+    function ESP:AddPet(pet)
+        if self.PetObjects[pet] then return end
+        local bill = createBillboard(pet, "Pet")
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Text = "🐾"
+        label.Font = self.Font
+        label.TextSize = self.TextSize
+        label.TextColor3 = Color3.new(1, 0.5, 1)
+        label.Parent = bill
+        self.PetObjects[pet] = { bill = bill, label = label }
+    end
+    function ESP:RemovePet(pet)
+        local t = self.PetObjects[pet]
+        if t then
+            t.bill:Destroy()
+            self.PetObjects[pet] = nil
+        end
+    end
+    function ESP:UpdatePet()
+        if not self.ShowPet then
+            for _, v in pairs(self.PetObjects) do v.bill.Enabled = false end
+            return
+        end
+        for pet, t in pairs(self.PetObjects) do
+            if pet.Parent then
+                t.bill.Enabled = true
+            else
+                t.bill.Enabled = false
+            end
+        end
+    end
+
+    -- CHEST ESP
+    function ESP:AddChest(chest)
+        if self.ChestObjects[chest] then return end
+        local bill = createBillboard(chest, "Chest")
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Text = "📦"
+        label.Font = self.Font
+        label.TextSize = self.TextSize
+        label.TextColor3 = Color3.new(1, 0.8, 0)
+        label.Parent = bill
+        self.ChestObjects[chest] = { bill = bill, label = label }
+    end
+    function ESP:RemoveChest(chest)
+        local t = self.ChestObjects[chest]
+        if t then
+            t.bill:Destroy()
+            self.ChestObjects[chest] = nil
+        end
+    end
+    function ESP:UpdateChest()
+        if not self.ShowChest then
+            for _, v in pairs(self.ChestObjects) do v.bill.Enabled = false end
+            return
+        end
+        for chest, t in pairs(self.ChestObjects) do
+            if chest.Parent then
+                t.bill.Enabled = true
+            else
+                t.bill.Enabled = false
+            end
+        end
+    end
+
+    -- COIN ESP
+    function ESP:AddCoin(coin)
+        if self.CoinObjects[coin] then return end
+        local bill = createBillboard(coin, "Coin")
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Text = "🪙"
+        label.Font = self.Font
+        label.TextSize = self.TextSize
+        label.TextColor3 = Color3.new(1, 1, 0)
+        label.Parent = bill
+        self.CoinObjects[coin] = { bill = bill, label = label }
+    end
+    function ESP:RemoveCoin(coin)
+        local t = self.CoinObjects[coin]
+        if t then
+            t.bill:Destroy()
+            self.CoinObjects[coin] = nil
+        end
+    end
+    function ESP:UpdateCoin()
+        if not self.ShowCoin then
+            for _, v in pairs(self.CoinObjects) do v.bill.Enabled = false end
+            return
+        end
+        for coin, t in pairs(self.CoinObjects) do
+            if coin.Parent then
+                t.bill.Enabled = true
+            else
+                t.bill.Enabled = false
+            end
+        end
+    end
+
+    -- COLLECTIBLE ESP (x2 coin, diamond, ruby, etc.)
+    function ESP:AddCollect(collect)
+        if self.CollectObjects[collect] then return end
+        local bill = createBillboard(collect, "Collect")
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Text = "💎"
+        label.Font = self.Font
+        label.TextSize = self.TextSize
+        label.TextColor3 = Color3.new(0, 1, 1)
+        label.Parent = bill
+        self.CollectObjects[collect] = { bill = bill, label = label }
+    end
+    function ESP:RemoveCollect(collect)
+        local t = self.CollectObjects[collect]
+        if t then
+            t.bill:Destroy()
+            self.CollectObjects[collect] = nil
+        end
+    end
+    function ESP:UpdateCollect()
+        if not self.ShowCollect then
+            for _, v in pairs(self.CollectObjects) do v.bill.Enabled = false end
+            return
+        end
+        for collect, t in pairs(self.CollectObjects) do
+            if collect.Parent then
+                t.bill.Enabled = true
+            else
+                t.bill.Enabled = false
+            end
+        end
+    end
+end
+
+--------------------------------------------------------------------
+-- 5. SILENT AIM & TRIGGERBOT
+--------------------------------------------------------------------
+local Aimbot = {
+    Enabled = Cfg.SilentAim == true,
+    HitPart = Cfg.HitPart or "Head",
+    FOV = Cfg.SilentFOV or 80,
+    UseFOV = Cfg.UseFOV ~= false,
+    VisibleCheck = Cfg.VisibleCheck ~= false,
+    Smoothness = Cfg.Smoothness or 0,
+    Predict = Cfg.Predict ~= false,
+    ShowFOV = Cfg.ShowFOV ~= false,
+    FOVCircle = nil
+}
+local Trigger = {
+    Enabled = Cfg.TriggerBot == true,
+    Delay = Cfg.TriggerDelay or 0
+}
+
+local function getClosestPlayer()
+    local closest, dist = nil, math.huge
+    local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return end
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr == LP or plr.Team == LP.Team then continue end
+        local char = plr.Character
+        local part = char and char:FindFirstChild(Aimbot.HitPart)
+        if part then
+            local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
+            if onScreen then
+                local mag = (Vector2.new(pos.X, pos.Y) - UIS:GetMouseLocation()).Magnitude
+                if mag < dist and mag <= Aimbot.FOV then
+                    if Aimbot.VisibleCheck then
+                        local ray = Ray.new(Camera.CFrame.Position, (part.Position - Camera.CFrame.Position).Unit * 5000)
+                        local hit, pos = workspace:FindPartOnRayWithIgnoreList(ray, { LP.Character })
+                        if hit and hit:IsDescendantOf(char) then
+                            closest = part
+                            dist = mag
+                        end
+                    else
+                        closest = part
+                        dist = mag
+                    end
+                end
+            end
+        end
+    end
+    return closest
+end
+
+-- FOV Circle
+if Aimbot.ShowFOV then
+    Aimbot.FOVCircle = Drawing.new("Circle")
+    Aimbot.FOVCircle.Radius = Aimbot.FOV
+    Aimbot.FOVCircle.Thickness = 1
+    Aimbot.FOVCircle.Color = Color3.new(1, 1, 1)
+    Aimbot.FOVCircle.NumSides = 64
+    Aimbot.FOVCircle.Filled = false
+    Aimbot.FOVCircle.Visible = true
+    Aimbot.FOVCircle.Position = UIS:GetMouseLocation()
+end
+
+-- Silent Aim Hook
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    if Aimbot.Enabled and method == "FireServer" and self.Name:find("Shoot") then
+        local closest = getClosestPlayer()
+        if closest then
+            local args = {...}
+            local pos = closest.Position
+            if Aimbot.Predict then
+                local vel = closest.AssemblyLinearVelocity
+                pos = pos + vel * 0.1
+            end
+            args[1] = pos
+            return oldNamecall(self, unpack(args))
+        end
+    end
+    return oldNamecall(self, ...)
+end)
+
+-- TriggerBot
+spawn(function()
+    while
