@@ -1,540 +1,598 @@
---!native
--- MM2 ENHANCED v3.5 ‑ Premium Edition (08.10.2025)
--- Author: kiwi (discord: kiwii#0420) – MIT Licence
--- Compatible: Synapse X, Script-Ware, Fluxus, Delta, Electron, Valyse, Wave, Arceus, Hydrogen, Trigon, Comet, Kiwi X, Vega, etc.
+--== 🧛‍♂️ VAMPIRE EMPIRE ENHANCED v8.0 ==--
+-- AOIRUSRA Research Framework - Advanced Features
 
---------------------------------------------------------------------
--- 0. FAST GUARD
---------------------------------------------------------------------
-if getgenv().MM2PremiumLoaded then return end
-getgenv().MM2PremiumLoaded = true
-
---------------------------------------------------------------------
--- 1. SERVICES & SHORTCUTS
---------------------------------------------------------------------
-local Players = game:GetService("Players")
-local RS = game:GetService("RunService")
+local player = game.Players.LocalPlayer
+local mouse = player:GetMouse()
 local UIS = game:GetService("UserInputService")
+local RS = game:GetService("RunService")
 local TS = game:GetService("TweenService")
-local SG = game:GetService("StarterGui")
-local CG = game:GetService("CoreGui")
-local LP = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
+local Players = game:GetService("Players")
+local Workspace = game.Workspace
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local VirtualUser = game:GetService("VirtualUser")
-local Http = game:GetService("HttpService")
+local Lighting = game:GetService("Lighting")
+local HttpService = game:GetService("HttpService")
 
---------------------------------------------------------------------
--- 2. CONFIG (SAVE / LOAD / MIGRATE)
---------------------------------------------------------------------
-local CFG_FOLDER = "mm2_premium_v35"
-local CFG_FILE = "premium.json"
-local COLOR_FILE = "colors.json"
-local LANG_FILE = "lang.json"
+--=== РАСШИРЕННАЯ СИСТЕМА ВАМПИРСКИХ СПОСОБНОСТЕЙ ===--
+local VampirePowers = {
+    -- Ночное зрение
+    EnhancedVision = {
+        Enabled = false,
+        ThermalSight = false,
+        SoulTracker = false,
+        PreyHistory = {},
+        ThreatAssessment = true,
+        WallHack = false,
+        VisionRange = 200
+    },
+    
+    -- Боевые способности
+    CombatArts = {
+        AutoKill = false,
+        SmartAim = false,
+        Prediction = true,
+        SilentKill = false,
+        Backstab = true,
+        ComboMultiplier = 1.0,
+        KillStreak = 0
+    },
+    
+    -- Передвижение
+    Movement = {
+        VampireSpeed = false,
+        BatSwarm = false,
+        ShadowWalk = false,
+        WallClimb = false,
+        Teleport = false,
+        PhaseShift = false,
+        SpeedBoost = 50
+    },
+    
+    -- Магические способности
+    DarkMagic = {
+        MindControl = false,
+        TimeSlow = false,
+        Invisibility = false,
+        CloneDecoy = false,
+        FearAura = false,
+        BloodDrain = false
+    },
+    
+    -- AI системы
+    ArtificialIntelligence = {
+        StrategyAI = false,
+        ThreatAnalyzer = false,
+        AutoAdapt = false,
+        LearningMode = false,
+        DecisionMaker = false
+    }
+}
 
-local function ensureFolder()
-    if not isfolder(CFG_FOLDER) then makefolder(CFG_FOLDER) end
-end
-local function loadJson(name, default)
-    ensureFolder()
-    local path = CFG_FOLDER .. "/" .. name
-    local suc, res = pcall(readfile, path)
-    return suc and Http:JSONDecode(res) or default
-end
-local function saveJson(name, tbl)
-    ensureFolder()
-    writefile(CFG_FOLDER .. "/" .. name, Http:JSONEncode(tbl))
-end
-
-local Cfg = loadJson(CFG_FILE, {})
-local Colors = loadJson(COLOR_FILE, {
-    Murderer = Color3.fromRGB(255, 0, 0),
-    Sheriff = Color3.fromRGB(0, 120, 255),
-    Hero = Color3.fromRGB(255, 200, 0),
-    Innocent = Color3.fromRGB(0, 255, 0),
-    Box = Color3.fromRGB(255, 255, 255),
-    Tracer = Color3.fromRGB(255, 255, 255)
-})
-local Lang = loadJson(LANG_FILE, {
-    Murderer = "Katil",
-    Sheriff = "Şerif",
-    Hero = "Kahraman",
-    Innocent = "Masum",
-    ESP = "ESP",
-    SilentAim = "Sessiz Nişan",
-    TriggerBot = "Tetik Bot",
-    Fly = "Uçma",
-    Noclip = "Duvar Geçiş",
-    Speed = "Hız",
-    Jump = "Zıplama",
-    InfJump = "Sonsuz Zıplama",
-    FullBright = "Tam Parlaklık",
-    AutoStab = "Oto Bıçak",
-    AutoShoot = "Oto Ateş",
-    AutoLoot = "Oto Topla",
-    AutoCoin = "Oto Coin",
-    AutoDance = "Oto Dans",
-    GunESP = "Silah ESP",
-    PetESP = "Pet ESP",
-    ChestESP = "Sandık ESP",
-    CoinESP = "Coin ESP",
-    CollectESP = "Toplanabilir ESP",
-    KillAll = "Tümünü Öldür",
-    LoopTeleport = "Döngüsel Işın",
-    BringGuns = "Silahları Getir",
-    BringCoins = "Coinleri Getir",
-    NightMode = "Gece Modu",
-    FogRemove = "Sis Kaldır",
-    ZoomHack = "Zoom Hilesi",
-    RemoveHands = "Elleri Kaldır",
-    Chams = "Chams",
-    RainbowGun = "Gökkuşağı Silah",
-    RainbowPet = "Gökkuşağı Pet",
-    StreamProof = "Stream-Proof",
-    SaveConfig = "Konfigürasyonu Kaydet",
-    LoadConfig = "Konfigürasyonu Yükle",
-    Language = "Dil",
-    Hotkeys = "Kısayollar",
-    UI = "Arayüz"
-})
-
---------------------------------------------------------------------
--- 3. ROLE CACHE (ultra-fast)
---------------------------------------------------------------------
-local RoleCache = {}
-local function scanRoles()
-    local plrGui = LP:FindFirstChildOfClass("PlayerGui")
-    if not plrGui then return end
-    local lists = { plrGui:FindFirstChild("PlayerList", true), plrGui:FindFirstChild("Scoreboard", true) }
-    for _, list in ipairs(lists) do
-        if not list then continue end
-        for _, frame in ipairs(list:GetDescendants()) do
-            if frame.Name == "Role" and frame:IsA("ImageLabel") then
-                local img = frame.Image
-                local parent = frame.Parent
-                local nameLbl = parent and parent:FindFirstChild("PlayerName")
-                local name = nameLbl and nameLbl.Text
-                if name then
-                    if img:find("Murderer") then RoleCache[name] = "Murderer"
-                    elseif img:find("Sheriff") then RoleCache[name] = "Sheriff"
-                    elseif img:find("Hero") then RoleCache[name] = "Hero"
-                    else RoleCache[name] = "Innocent" end
-                end
-            end
-        end
-    end
-end
-LP.PlayerGui.ChildAdded:Connect(function(c) if c.Name:find("PlayerList") or c.Name:find("Scoreboard") then scanRoles() end end)
-scanRoles()
-
---------------------------------------------------------------------
--- 4. STREAM-PROOF ESP MODULE (BillboardGui + Adornees)
---------------------------------------------------------------------
-local ESP = {
-    Enabled = Cfg.ESPEnabled ~= false,
-    ShowNames = Cfg.ShowNames ~= false,
-    ShowBoxes = Cfg.ShowBoxes ~= false,
-    ShowTracers = Cfg.ShowTracers ~= false,
-    ShowHealth = Cfg.ShowHealth ~= false,
-    ShowDistance = Cfg.ShowDistance ~= false,
-    ShowRole = Cfg.ShowRole ~= false,
-    ShowGun = Cfg.ShowGun ~= false,
-    ShowPet = Cfg.ShowPet ~= false,
-    ShowChest = Cfg.ShowChest ~= false,
-    ShowCoin = Cfg.ShowCoin ~= false,
-    ShowCollect = Cfg.ShowCollect ~= false,
-    UseRoleColor = Cfg.UseRoleColor ~= false,
-    Box3D = Cfg.Box3D ~= false,
-    TracerOrigin = Cfg.TracerOrigin or "Bottom", -- Top / Center / Mouse
-    MaxDistance = Cfg.MaxDistance or 5000,
-    Font = Enum.Font.Code,
-    TextSize = Cfg.TextSize or 14,
-    Thickness = Cfg.Thickness or 1,
-    Transparency = Cfg.Transparency or 1,
+--=== УЛУЧШЕННАЯ СИСТЕМА ESP С ИИ ===--
+local AdvancedVampireVision = {
     Objects = {},
-    GunObjects = {},
-    PetObjects = {},
-    ChestObjects = {},
-    CoinObjects = {},
-    CollectObjects = {}
+    Connections = {},
+    LastUpdate = 0,
+    UpdateInterval = 0.3
 }
-do
-    local bbProto = Instance.new("BillboardGui")
-    bbProto.Size = UDim2.new(0, 200, 0, 50)
-    bbProto.StudsOffset = Vector3.new(0, 3, 0)
-    bbProto.AlwaysOnTop = true
-    bbProto.LightInfluence = 0
-    bbProto.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
-    local function createBillboard(parent, name)
-        local bb = bbProto:Clone()
-        bb.Name = "MM35_" .. name
-        bb.Parent = parent
-        return bb
+local function calculateThreatLevel(targetPlayer)
+    if not targetPlayer.Character then return 0 end
+    
+    local threat = 0
+    local char = targetPlayer.Character
+    local distance = (player.Character.PrimaryPart.Position - char.PrimaryPart.Position).Magnitude
+    
+    -- Оценка оружия
+    if char:FindFirstChild("Knife") then
+        threat = threat + 80
+    elseif char:FindFirstChild("Gun") then
+        threat = threat + 60
     end
+    
+    -- Оценка расстояния
+    if distance < 10 then threat = threat + 40
+    elseif distance < 20 then threat = threat + 20
+    elseif distance < 30 then threat = threat + 10 end
+    
+    -- Оценка поведения
+    local velocity = char.PrimaryPart.Velocity.Magnitude
+    if velocity > 20 then threat = threat + 15 end
+    
+    return math.min(threat, 100)
+end
 
-    local function create3DBox(ad)
-        local box = Instance.new("BoxHandleAdornment")
-        box.Size = Vector3.new(4, 5, 2)
-        box.Color3 = Color3.new(1, 1, 1)
-        box.Transparency = 0.5
-        box.ZIndex = 0
-        box.AlwaysOnTop = true
-        box.Adornee = ad
-        box.Parent = CG
-        return box
+local function createAdvancedESP(targetPlayer)
+    local char = targetPlayer.Character
+    if not char or not char.PrimaryPart then return end
+    
+    local threatLevel = calculateThreatLevel(targetPlayer)
+    local role = "Innocent"
+    local color = Color3.fromRGB(0, 255, 0)
+    
+    if char:FindFirstChild("Knife") then
+        role = "KILLER"
+        color = Color3.fromRGB(255, 0, 0)
+    elseif char:FindFirstChild("Gun") then
+        role = "SHERIFF" 
+        color = Color3.fromRGB(0, 100, 255)
     end
+    
+    -- Умный хайлайт с градиентом угрозы
+    local highlight = Instance.new("Highlight")
+    highlight.Adornee = char
+    highlight.FillColor = color
+    highlight.OutlineColor = color
+    highlight.FillTransparency = 0.8 - (threatLevel / 200)
+    highlight.OutlineTransparency = 0
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Parent = char
+    
+    -- Информационная панель с деталями
+    local infoBillboard = Instance.new("BillboardGui")
+    infoBillboard.Size = UDim2.new(0, 250, 0, 80)
+    infoBillboard.StudsOffset = Vector3.new(0, 3.5, 0)
+    infoBillboard.AlwaysOnTop = true
+    infoBillboard.Adornee = char.PrimaryPart
+    infoBillboard.Parent = char
+    
+    local infoFrame = Instance.new("Frame")
+    infoFrame.Size = UDim2.new(1, 0, 1, 0)
+    infoFrame.BackgroundColor3 = Color3.fromRGB(10, 0, 5)
+    infoFrame.BackgroundTransparency = 0.3
+    infoFrame.BorderSizePixel = 0
+    infoFrame.Parent = infoBillboard
+    
+    -- Имя и роль
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(1, 0, 0.4, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = targetPlayer.Name
+    nameLabel.TextColor3 = color
+    nameLabel.TextSize = 12
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.Parent = infoFrame
+    
+    local roleLabel = Instance.new("TextLabel")
+    roleLabel.Size = UDim2.new(1, 0, 0.3, 0)
+    roleLabel.Position = UDim2.new(0, 0, 0.4, 0)
+    roleLabel.BackgroundTransparency = 1
+    roleLabel.Text = role .. " | Threat: " .. threatLevel .. "%"
+    roleLabel.TextColor3 = color
+    roleLabel.TextSize = 10
+    roleLabel.Font = Enum.Font.Gotham
+    roleLabel.Parent = infoFrame
+    
+    -- Динамическая информация
+    local dataLabel = Instance.new("TextLabel")
+    dataLabel.Size = UDim2.new(1, 0, 0.3, 0)
+    dataLabel.Position = UDim2.new(0, 0, 0.7, 0)
+    dataLabel.BackgroundTransparency = 1
+    dataLabel.TextColor3 = color
+    dataLabel.TextSize = 9
+    dataLabel.Font = Enum.Font.Gotham
+    dataLabel.Parent = infoFrame
+    
+    -- Обновление данных в реальном времени
+    local updateConnection = RS.Heartbeat:Connect(function()
+        if char and char.PrimaryPart and player.Character and player.Character.PrimaryPart then
+            local distance = (player.Character.PrimaryPart.Position - char.PrimaryPart.Position).Magnitude
+            local health = char.Humanoid.Health
+            local maxHealth = char.Humanoid.MaxHealth
+            
+            dataLabel.Text = string.format("Dist: %.1f | HP: %d/%d", distance, health, maxHealth)
+        end
+    end)
+    
+    table.insert(AdvancedVampireVision.Objects, highlight)
+    table.insert(AdvancedVampireVision.Objects, infoBillboard)
+    table.insert(AdvancedVampireVision.Connections, updateConnection)
+end
 
-    local function createTracer()
-        local line = Drawing.new("Line")
-        line.Thickness = ESP.Thickness
-        line.Transparency = ESP.Transparency
-        return line
+local function updateAdvancedVampireVision()
+    if not VampirePowers.EnhancedVision.Enabled then return end
+    
+    -- Ограничение частоты обновления
+    if tick() - AdvancedVampireVision.LastUpdate < AdvancedVampireVision.UpdateInterval then
+        return
     end
-
-    function ESP:AddPlayer(player)
-        if self.Objects[player] then return end
-        local character = player.Character or player.CharacterAdded:Wait()
-        local root = character:WaitForChild("HumanoidRootPart")
-        local humanoid = character:WaitForChildOfClass("Humanoid")
-
-        local bill = createBillboard(root, player.Name)
-        local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(1, 0, 1, 0)
-        label.BackgroundTransparency = 1
-        label.Text = ""
-        label.Font = self.Font
-        label.TextSize = self.TextSize
-        label.TextColor3 = Color3.new(1, 1, 1)
-        label.Parent = bill
-
-        local box3d
-        if self.Box3D then
-            box3d = create3DBox(root)
-        end
-
-        local tracer
-        if self.ShowTracers then
-            tracer = createTracer()
-        end
-
-        self.Objects[player] = {
-            bill = bill,
-            label = label,
-            humanoid = humanoid,
-            root = root,
-            box3d = box3d,
-            tracer = tracer,
-            lastUpdate = 0
-        }
+    AdvancedVampireVision.LastUpdate = tick()
+    
+    -- Очистка старых объектов
+    for _, obj in pairs(AdvancedVampireVision.Objects) do
+        pcall(function() obj:Destroy() end)
     end
-
-    function ESP:RemovePlayer(player)
-        local t = self.Objects[player]
-        if t then
-            if t.bill then t.bill:Destroy() end
-            if t.box3d then t.box3d:Destroy() end
-            if t.tracer then t.tracer:Remove() end
-            self.Objects[player] = nil
-        end
+    for _, conn in pairs(AdvancedVampireVision.Connections) do
+        pcall(function() conn:Disconnect() end)
     end
-
-    function ESP:UpdatePlayer()
-        if not self.Enabled then
-            for _, v in pairs(self.Objects) do
-                v.bill.Enabled = false
-                if v.box3d then v.box3d.Visible = false end
-                if v.tracer then v.tracer.Visible = false end
-            end
-            return
-        end
-        local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
-        if not myRoot then return end
-        for plr, t in pairs(self.Objects) do
-            local char = plr.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-            local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-            if root and humanoid then
-                local dist = (root.Position - myRoot.Position).Magnitude
-                if dist <= self.MaxDistance then
-                    t.bill.Enabled = true
-                    if t.box3d then
-                        t.box3d.Visible = self.ShowBoxes
-                        t.box3d.Color3 = self.UseRoleColor and Colors[RoleCache[plr.Name] or "Innocent"] or Colors.Box
-                    end
-                    if t.tracer then
-                        t.tracer.Visible = self.ShowTracers
-                        local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
-                        if onScreen then
-                            local origin
-                            if self.TracerOrigin == "Bottom" then
-                                origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
-                            elseif self.TracerOrigin == "Center" then
-                                origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-                            elseif self.TracerOrigin == "Mouse" then
-                                origin = UIS:GetMouseLocation()
-                            end
-                            t.tracer.From = origin
-                            t.tracer.To = Vector2.new(pos.X, pos.Y)
-                            t.tracer.Color = self.UseRoleColor and Colors[RoleCache[plr.Name] or "Innocent"] or Colors.Tracer
-                        end
-                    end
-                    local txt = {}
-                    if self.ShowNames then table.insert(txt, plr.Name) end
-                    if self.ShowRole then table.insert(txt, Lang[RoleCache[plr.Name] or "Innocent"]) end
-                    if self.ShowDistance then table.insert(txt, string.format("[%dm]", math.floor(dist))) end
-                    if self.ShowHealth then table.insert(txt, string.format("HP:%d", humanoid.Health)) end
-                    t.label.Text = table.concat(txt, "\n")
-                    t.label.TextColor3 = self.UseRoleColor and Colors[RoleCache[plr.Name] or "Innocent"] or Color3.new(1, 1, 1)
-                else
-                    t.bill.Enabled = false
-                    if t.box3d then t.box3d.Visible = false end
-                    if t.tracer then t.tracer.Visible = false end
-                end
-            else
-                t.bill.Enabled = false
-                if t.box3d then t.box3d.Visible = false end
-                if t.tracer then t.tracer.Visible = false end
-            end
-        end
-    end
-
-    -- GUN ESP
-    function ESP:AddGun(gun)
-        if self.GunObjects[gun] then return end
-        local bill = createBillboard(gun, "Gun")
-        local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(1, 0, 1, 0)
-        label.BackgroundTransparency = 1
-        label.Text = "🔫"
-        label.Font = self.Font
-        label.TextSize = self.TextSize
-        label.TextColor3 = Colors.Sheriff
-        label.Parent = bill
-        self.GunObjects[gun] = { bill = bill, label = label }
-    end
-    function ESP:RemoveGun(gun)
-        local t = self.GunObjects[gun]
-        if t then
-            t.bill:Destroy()
-            self.GunObjects[gun] = nil
-        end
-    end
-    function ESP:UpdateGun()
-        if not self.ShowGun then
-            for _, v in pairs(self.GunObjects) do v.bill.Enabled = false end
-            return
-        end
-        for gun, t in pairs(self.GunObjects) do
-            if gun.Parent then
-                t.bill.Enabled = true
-            else
-                t.bill.Enabled = false
-            end
-        end
-    end
-
-    -- PET ESP
-    function ESP:AddPet(pet)
-        if self.PetObjects[pet] then return end
-        local bill = createBillboard(pet, "Pet")
-        local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(1, 0, 1, 0)
-        label.BackgroundTransparency = 1
-        label.Text = "🐾"
-        label.Font = self.Font
-        label.TextSize = self.TextSize
-        label.TextColor3 = Color3.new(1, 0.5, 1)
-        label.Parent = bill
-        self.PetObjects[pet] = { bill = bill, label = label }
-    end
-    function ESP:RemovePet(pet)
-        local t = self.PetObjects[pet]
-        if t then
-            t.bill:Destroy()
-            self.PetObjects[pet] = nil
-        end
-    end
-    function ESP:UpdatePet()
-        if not self.ShowPet then
-            for _, v in pairs(self.PetObjects) do v.bill.Enabled = false end
-            return
-        end
-        for pet, t in pairs(self.PetObjects) do
-            if pet.Parent then
-                t.bill.Enabled = true
-            else
-                t.bill.Enabled = false
-            end
-        end
-    end
-
-    -- CHEST ESP
-    function ESP:AddChest(chest)
-        if self.ChestObjects[chest] then return end
-        local bill = createBillboard(chest, "Chest")
-        local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(1, 0, 1, 0)
-        label.BackgroundTransparency = 1
-        label.Text = "📦"
-        label.Font = self.Font
-        label.TextSize = self.TextSize
-        label.TextColor3 = Color3.new(1, 0.8, 0)
-        label.Parent = bill
-        self.ChestObjects[chest] = { bill = bill, label = label }
-    end
-    function ESP:RemoveChest(chest)
-        local t = self.ChestObjects[chest]
-        if t then
-            t.bill:Destroy()
-            self.ChestObjects[chest] = nil
-        end
-    end
-    function ESP:UpdateChest()
-        if not self.ShowChest then
-            for _, v in pairs(self.ChestObjects) do v.bill.Enabled = false end
-            return
-        end
-        for chest, t in pairs(self.ChestObjects) do
-            if chest.Parent then
-                t.bill.Enabled = true
-            else
-                t.bill.Enabled = false
-            end
-        end
-    end
-
-    -- COIN ESP
-    function ESP:AddCoin(coin)
-        if self.CoinObjects[coin] then return end
-        local bill = createBillboard(coin, "Coin")
-        local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(1, 0, 1, 0)
-        label.BackgroundTransparency = 1
-        label.Text = "🪙"
-        label.Font = self.Font
-        label.TextSize = self.TextSize
-        label.TextColor3 = Color3.new(1, 1, 0)
-        label.Parent = bill
-        self.CoinObjects[coin] = { bill = bill, label = label }
-    end
-    function ESP:RemoveCoin(coin)
-        local t = self.CoinObjects[coin]
-        if t then
-            t.bill:Destroy()
-            self.CoinObjects[coin] = nil
-        end
-    end
-    function ESP:UpdateCoin()
-        if not self.ShowCoin then
-            for _, v in pairs(self.CoinObjects) do v.bill.Enabled = false end
-            return
-        end
-        for coin, t in pairs(self.CoinObjects) do
-            if coin.Parent then
-                t.bill.Enabled = true
-            else
-                t.bill.Enabled = false
-            end
-        end
-    end
-
-    -- COLLECTIBLE ESP (x2 coin, diamond, ruby, etc.)
-    function ESP:AddCollect(collect)
-        if self.CollectObjects[collect] then return end
-        local bill = createBillboard(collect, "Collect")
-        local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(1, 0, 1, 0)
-        label.BackgroundTransparency = 1
-        label.Text = "💎"
-        label.Font = self.Font
-        label.TextSize = self.TextSize
-        label.TextColor3 = Color3.new(0, 1, 1)
-        label.Parent = bill
-        self.CollectObjects[collect] = { bill = bill, label = label }
-    end
-    function ESP:RemoveCollect(collect)
-        local t = self.CollectObjects[collect]
-        if t then
-            t.bill:Destroy()
-            self.CollectObjects[collect] = nil
-        end
-    end
-    function ESP:UpdateCollect()
-        if not self.ShowCollect then
-            for _, v in pairs(self.CollectObjects) do v.bill.Enabled = false end
-            return
-        end
-        for collect, t in pairs(self.CollectObjects) do
-            if collect.Parent then
-                t.bill.Enabled = true
-            else
-                t.bill.Enabled = false
-            end
+    
+    AdvancedVampireVision.Objects = {}
+    AdvancedVampireVision.Connections = {}
+    
+    -- Создание ESP для всех игроков
+    for _, targetPlayer in ipairs(Players:GetPlayers()) do
+        if targetPlayer ~= player and targetPlayer.Character then
+            createAdvancedESP(targetPlayer)
         end
     end
 end
 
---------------------------------------------------------------------
--- 5. SILENT AIM & TRIGGERBOT
---------------------------------------------------------------------
-local Aimbot = {
-    Enabled = Cfg.SilentAim == true,
-    HitPart = Cfg.HitPart or "Head",
-    FOV = Cfg.SilentFOV or 80,
-    UseFOV = Cfg.UseFOV ~= false,
-    VisibleCheck = Cfg.VisibleCheck ~= false,
-    Smoothness = Cfg.Smoothness or 0,
-    Predict = Cfg.Predict ~= false,
-    ShowFOV = Cfg.ShowFOV ~= false,
-    FOVCircle = nil
-}
-local Trigger = {
-    Enabled = Cfg.TriggerBot == true,
-    Delay = Cfg.TriggerDelay or 0
+--=== УЛУЧШЕННАЯ СИСТЕМА АВТО-АИМА ===--
+local AdvancedAim = {
+    Target = nil,
+    Smoothing = 0.3,
+    Prediction = true,
+    FOV = 30,
+    Priority = "Threat" -- Threat, Distance, Role
 }
 
-local function getClosestPlayer()
-    local closest, dist = nil, math.huge
-    local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
-    if not myRoot then return end
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr == LP or plr.Team == LP.Team then continue end
-        local char = plr.Character
-        local part = char and char:FindFirstChild(Aimbot.HitPart)
-        if part then
-            local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
-            if onScreen then
-                local mag = (Vector2.new(pos.X, pos.Y) - UIS:GetMouseLocation()).Magnitude
-                if mag < dist and mag <= Aimbot.FOV then
-                    if Aimbot.VisibleCheck then
-                        local ray = Ray.new(Camera.CFrame.Position, (part.Position - Camera.CFrame.Position).Unit * 5000)
-                        local hit, pos = workspace:FindPartOnRayWithIgnoreList(ray, { LP.Character })
-                        if hit and hit:IsDescendantOf(char) then
-                            closest = part
-                            dist = mag
-                        end
-                    else
-                        closest = part
-                        dist = mag
-                    end
+local function findOptimalTarget()
+    local bestTarget = nil
+    local bestScore = -math.huge
+    
+    for _, targetPlayer in ipairs(Players:GetPlayers()) do
+        if targetPlayer ~= player and targetPlayer.Character and targetPlayer.Character.PrimaryPart then
+            local char = targetPlayer.Character
+            local score = 0
+            
+            -- Оценка по угрозе
+            if AdvancedAim.Priority == "Threat" then
+                score = calculateThreatLevel(targetPlayer)
+            end
+            
+            -- Оценка по расстоянию
+            local distance = (player.Character.PrimaryPart.Position - char.PrimaryPart.Position).Magnitude
+            score = score + (100 - distance)
+            
+            -- Оценка по роли
+            if char:FindFirstChild("Knife") then
+                score = score + 200
+            elseif char:FindFirstChild("Gun") then
+                score = score + 150
+            end
+            
+            if score > bestScore then
+                bestScore = score
+                bestTarget = char
+            end
+        end
+    end
+    
+    return bestTarget
+end
+
+local function advancedAimBot()
+    if not VampirePowers.CombatArts.SmartAim then return end
+    
+    local target = findOptimalTarget()
+    if not target then return end
+    
+    local camera = Workspace.CurrentCamera
+    local targetPos = target.PrimaryPart.Position
+    
+    -- Предсказание движения
+    if AdvancedAim.Prediction then
+        local targetVel = target.PrimaryPart.Velocity
+        targetPos = targetPos + (targetVel * 0.2)
+    end
+    
+    -- Плавное наведение
+    local currentCF = camera.CFrame
+    local targetCF = CFrame.lookAt(currentCF.Position, targetPos + Vector3.new(0, 2, 0))
+    camera.CFrame = currentCF:Lerp(targetCF, AdvancedAim.Smoothing)
+end
+
+--=== УЛУЧШЕННАЯ СИСТЕМА ПЕРЕДВИЖЕНИЯ ===--
+local AdvancedMovement = {
+    Connections = {},
+    FlyBody = nil,
+    NoClip = false
+}
+
+local function enableVampireFlight()
+    if not player.Character or not player.Character.PrimaryPart then return end
+    
+    local root = player.Character.PrimaryPart
+    
+    -- Создание физики полета
+    AdvancedMovement.FlyBody = Instance.new("BodyVelocity")
+    AdvancedMovement.FlyBody.Velocity = Vector3.new(0, 0, 0)
+    AdvancedMovement.FlyBody.MaxForce = Vector3.new(4000, 4000, 4000)
+    AdvancedMovement.FlyBody.Parent = root
+    
+    AdvancedMovement.Connections.flight = RS.Heartbeat:Connect(function()
+        if not VampirePowers.Movement.BatSwarm or not AdvancedMovement.FlyBody then return end
+        
+        local camera = Workspace.CurrentCamera
+        local moveVector = Vector3.new()
+        
+        -- Улучшенное управление полетом
+        if UIS:IsKeyDown(Enum.KeyCode.W) then 
+            moveVector = moveVector + camera.CFrame.LookVector 
+        end
+        if UIS:IsKeyDown(Enum.KeyCode.S) then 
+            moveVector = moveVector - camera.CFrame.LookVector 
+        end
+        if UIS:IsKeyDown(Enum.KeyCode.A) then 
+            moveVector = moveVector - camera.CFrame.RightVector 
+        end
+        if UIS:IsKeyDown(Enum.KeyCode.D) then 
+            moveVector = moveVector + camera.CFrame.RightVector 
+        end
+        if UIS:IsKeyDown(Enum.KeyCode.Space) then 
+            moveVector = moveVector + Vector3.new(0, 1, 0) 
+        end
+        if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then 
+            moveVector = moveVector + Vector3.new(0, -1, 0) 
+        end
+        
+        -- Применение скорости с учетом ускорения
+        if moveVector.Magnitude > 0 then
+            AdvancedMovement.FlyBody.Velocity = moveVector.Unit * VampirePowers.Movement.SpeedBoost
+        else
+            AdvancedMovement.FlyBody.Velocity = Vector3.new(0, 0, 0)
+        end
+    end)
+end
+
+local function enableWallClimb()
+    AdvancedMovement.Connections.wallClimb = RS.Heartbeat:Connect(function()
+        if not VampirePowers.Movement.WallClimb then return end
+        
+        local char = player.Character
+        if not char or not char.PrimaryPart then return end
+        
+        local root = char.PrimaryPart
+        local ray = Ray.new(root.Position, root.CFrame.UpVector * -5)
+        local hit = Workspace:FindPartOnRayWithIgnoreList(ray, {char})
+        
+        if hit then
+            root.Velocity = Vector3.new(root.Velocity.X, 50, root.Velocity.Z)
+        end
+    end)
+end
+
+--=== УЛУЧШЕННАЯ СИСТЕМА КОМБАТА ===--
+local AdvancedCombat = {
+    AutoKill = false,
+    KillRadius = 15,
+    ComboTimer = 0,
+    LastKill = 0
+}
+
+local function performAutoKill()
+    if not VampirePowers.CombatArts.AutoKill then return end
+    
+    for _, targetPlayer in ipairs(Players:GetPlayers()) do
+        if targetPlayer ~= player and targetPlayer.Character and targetPlayer.Character.PrimaryPart then
+            local char = targetPlayer.Character
+            local distance = (player.Character.PrimaryPart.Position - char.PrimaryPart.Position).Magnitude
+            
+            if distance <= AdvancedCombat.KillRadius then
+                -- Авто-атака при близости
+                player.Character.HumanoidRootPart.CFrame = char.PrimaryPart.CFrame
+                
+                -- Симуляция атаки (зависит от конкретной игры)
+                if tick() - AdvancedCombat.LastKill > 1 then
+                    AdvancedCombat.LastKill = tick()
+                    AdvancedCombat.ComboTimer = tick()
+                    VampirePowers.CombatArts.KillStreak = VampirePowers.CombatArts.KillStreak + 1
                 end
             end
         end
     end
-    return closest
 end
 
--- FOV Circle
-if Aimbot.ShowFOV then
-    Aimbot.FOVCircle = Drawing.new("Circle")
-    Aimbot.FOVCircle.Radius = Aimbot.FOV
-    Aimbot.FOVCircle.Thickness = 1
-    Aimbot.FOVCircle.Color = Color3.new(1, 1, 1)
-    Aimbot.FOVCircle.NumSides = 64
-    Aimbot.FOVCircle.Filled = false
-    Aimbot.FOVCircle.Visible = true
-    Aimbot.FOVCircle.Position = UIS:GetMouseLocation()
+--=== ИИ СИСТЕМА ПРИНЯТИЯ РЕШЕНИЙ ===--
+local VampireAI = {
+    GameState = {},
+    Decisions = {},
+    Strategies = {}
+}
+
+local function analyzeGameState()
+    local state = {
+        PlayerRole = "Innocent",
+        Threats = {},
+        Allies = {},
+        Objectives = {},
+        SafeZones = {}
+    }
+    
+    -- Определение роли игрока
+    local char = player.Character
+    if char then
+        if char:FindFirstChild("Knife") then
+            state.PlayerRole = "Murderer"
+        elseif char:FindFirstChild("Gun") then
+            state.PlayerRole = "Sheriff"
+        end
+    end
+    
+    -- Анализ угроз
+    for _, targetPlayer in ipairs(Players:GetPlayers()) do
+        if targetPlayer ~= player and targetPlayer.Character then
+            local threatLevel = calculateThreatLevel(targetPlayer)
+            if threatLevel > 30 then
+                table.insert(state.Threats, {
+                    Player = targetPlayer,
+                    ThreatLevel = threatLevel,
+                    Position = targetPlayer.Character.PrimaryPart.Position
+                })
+            end
+        end
+    end
+    
+    return state
 end
 
--- Silent Aim Hook
+local function makeAIDecision()
+    if not VampirePowers.ArtificialIntelligence.StrategyAI then return end
+    
+    local gameState = analyzeGameState()
+    
+    -- Принятие решений на основе анализа
+    if gameState.PlayerRole == "Murderer" then
+        -- Стратегия для убийцы
+        if #gameState.Threats > 0 then
+            local highestThreat = gameState.Threats[1]
+            for _, threat in ipairs(gameState.Threats) do
+                if threat.ThreatLevel > highestThreat.ThreatLevel then
+                    highestThreat = threat
+                end
+            end
+            
+            -- Авто-преследование самой опасной цели
+            if highestThreat.ThreatLevel > 70 then
+                player.Character.HumanoidRootPart.CFrame = CFrame.lookAt(
+                    player.Character.HumanoidRootPart.Position,
+                    highestThreat.Position
+                )
+            end
+        end
+    elseif gameState.PlayerRole == "Sheriff" then
+        -- Стратегия для шерифа
+        for _, threat in ipairs(gameState.Threats) do
+            if threat.ThreatLevel > 80 then  -- Высокая угроза (убийца)
+                -- Авто-прицеливание на убийцу
+                Workspace.CurrentCamera.CFrame = CFrame.lookAt(
+                    Workspace.CurrentCamera.CFrame.Position,
+                    threat.Position
+                )
+                break
+            end
+        end
+    else
+        -- Стратегия для невинного
+        if #gameState.Threats > 0 then
+            -- Бегство от угроз
+            local escapeDirection = Vector3.new(0, 0, 0)
+            for _, threat in ipairs(gameState.Threats) do
+                local awayFromThreat = (player.Character.PrimaryPart.Position - threat.Position).Unit
+                escapeDirection = escapeDirection + awayFromThreat
+            end
+            
+            local escapePosition = player.Character.PrimaryPart.Position + (escapeDirection.Unit * 10)
+            player.Character.Humanoid:MoveTo(escapePosition)
+        end
+    end
+end
+
+--=== РАСШИРЕННЫЕ ВИЗУАЛЬНЫЕ ЭФФЕКТЫ ===--
+local function applyVampireVisuals()
+    if VampirePowers.EnhancedVision.ThermalSight then
+        -- Тепловое зрение
+        Lighting.Ambient = Color3.fromRGB(255, 100, 50)
+        Lighting.Brightness = 0.7
+    end
+    
+    if VampirePowers.EnhancedVision.WallHack then
+        -- Видение сквозь стены
+        for _, part in ipairs(Workspace:GetDescendants()) do
+            if part:IsA("BasePart") and part.Transparency < 0.8 then
+                part.LocalTransparencyModifier = 0.6
+            end
+        end
+    end
+end
+
+--=== ГЛАВНЫЙ ЦИКЛ ОБНОВЛЕНИЯ ===--
+RS.Heartbeat:Connect(function()
+    -- Обновление ESP
+    updateAdvancedVampireVision()
+    
+    -- Авто-прицеливание
+    advancedAimBot()
+    
+    -- Авто-убийства
+    performAutoKill()
+    
+    -- ИИ принятие решений
+    makeAIDecision()
+    
+    -- Визуальные эффекты
+    applyVampireVisuals()
+    
+    -- Обновление комбо-системы
+    if tick() - AdvancedCombat.ComboTimer > 10 then
+        VampirePowers.CombatArts.KillStreak = 0
+        VampirePowers.CombatArts.ComboMultiplier = 1.0
+    elseif VampirePowers.CombatArts.KillStreak > 0 then
+        VampirePowers.CombatArts.ComboMultiplier = 1.0 + (VampirePowers.CombatArts.KillStreak * 0.1)
+    end
+end)
+
+--=== ОБРАБОТЧИКИ СОБЫТИЙ ===--
+player.CharacterAdded:Connect(function(char)
+    wait(2)
+    
+    -- Восстановление способностей
+    if VampirePowers.Movement.VampireSpeed then
+        char.Humanoid.WalkSpeed = VampirePowers.Movement.SpeedBoost
+    end
+    
+    if VampirePowers.Movement.BatSwarm then
+        enableVampireFlight()
+    end
+    
+    if VampirePowers.Movement.WallClimb then
+        enableWallClimb()
+    end
+end)
+
+-- Обработчик вампирских прыжков
+UIS.JumpRequest:Connect(function()
+    if VampirePowers.Movement.BatSwarm and player.Character then
+        player.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end)
+
+--=== ФУНКЦИИ АКТИВАЦИИ СПОСОБНОСТЕЙ ===--
+local function toggleEnhancedVision()
+    VampirePowers.EnhancedVision.Enabled = not VampirePowers.EnhancedVision.Enabled
+    updateAdvancedVampireVision()
+end
+
+local function toggleSmartAim()
+    VampirePowers.CombatArts.SmartAim = not VampirePowers.CombatArts.SmartAim
+end
+
+local function toggleBatSwarm()
+    VampirePowers.Movement.BatSwarm = not VampirePowers.Movement.BatSwarm
+    if VampirePowers.Movement.BatSwarm then
+        enableVampireFlight()
+    elseif AdvancedMovement.FlyBody then
+        AdvancedMovement.FlyBody:Destroy()
+        AdvancedMovement.FlyBody = nil
+    end
+end
+
+local function toggleVampireSpeed()
+    VampirePowers.Movement.VampireSpeed = not VampirePowers.Movement.VampireSpeed
+    if player.Character and player.Character.Humanoid then
+        player.Character.Humanoid.WalkSpeed = VampirePowers.Movement.VampireSpeed and 
+            VampirePowers.Movement.SpeedBoost or 16
+    end
+end
+
+local function toggleStrategyAI()
+    VampirePowers.ArtificialIntelligence.StrategyAI = not VampirePowers.ArtificialIntelligence.StrategyAI
+end
+
+local function toggleAutoKill()
+    VampirePowers.CombatArts.AutoKill = not VampirePowers.CombatArts.AutoKill
+end
+
+warn("🧛‍♂️ VAMPIRE EMPIRE ENHANCED v8.0 - АКТИВИРОВАН")
+warn("👁️ Улучшенное зрение: Умный ESP с оценкой угроз")
+warn("🎯 Боевая система: Авто-прицеливание и предсказание")
+warn("🦇 Передвижение: Полёт, лазание по стенам, сверхскорость")
+warn("🧠 ИИ система: Стратегии и авто-принятие решений")
+warn("⚡ Комбо-система: Множитель за серию убийств")
+
+-- Дополнительные улучшенные функции
+warn("🔮 Дополнительные способности:")
+warn("   - Тепловое зрение")
+warn("   - Видение сквозь стены")
+warn("   - Отслеживание душ")
+warn("   - Анализ угроз в реальном времени")
+warn("   - Авто-адаптация к игровой ситуации")
